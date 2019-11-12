@@ -1,5 +1,5 @@
 //
-// Created by yk0l0diy on 29/10/19.
+// Created by yk0l0diy on 12/11/19.
 //
 
 #include <unistd.h>
@@ -41,6 +41,7 @@ int main(int argc, char const *argv[]) {
     int addrlen = sizeof(address);
     char buffer[256];
 
+
     // Creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         perror("socket failed");
@@ -55,7 +56,14 @@ int main(int argc, char const *argv[]) {
     }
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
+
+    if (argv[1]) {
+        printf("Using port %s\n", argv[1]);
+        address.sin_port = htons(atoi(argv[1]));
+    } else {
+        printf("Using default port 1300\n");
+        address.sin_port = htons(PORT);
+    }
 
     // Bind the socket to the network address and port
     if (bind(server_fd, (struct sockaddr *) &address, sizeof(address)) < 0) {
@@ -68,22 +76,18 @@ int main(int argc, char const *argv[]) {
     }
 
     //variaveis para o select
-    struct timeval tv;
     fd_set sockets;
     int retval;
-
-    tv.tv_sec = TIM;
-    tv.tv_usec = 0;
 
     // inicializacao do conjunto de descritores de leitura
     FD_ZERO(&sockets);
     FD_SET(server_fd, &sockets);
 
-    int maior=0;
+    int maior = server_fd;
     while (1) {
 
         // o 1. argumento e' o Maximo descritor do conjunto +1
-        retval = select(server_fd + 1, &sockets, NULL, NULL, &tv);
+        retval = select(maior + 1, &sockets, NULL, NULL, NULL);
 
         // em seguida verifica-se qual dos descritores ficou pronto
         // para leitura (ou se houve erro ou timeout)
@@ -104,24 +108,30 @@ int main(int argc, char const *argv[]) {
             printf("New client connected.\n");
 
             FD_SET(server_fd, &sockets);
-            FD_SET(new_socket,&sockets);
-            tv.tv_sec = TIM;
-            if(new_socket>maior) maior=new_socket;
+            FD_SET(new_socket, &sockets);
+            if (new_socket > maior) maior = new_socket;
 
         } else {
-            strdate(buffer, 256);
-            for (int x=0;x<=maior;x++){
-                if(FD_ISSET(x,&sockets)) send(x, buffer, strlen(buffer), 0);
-
+//            strdate(buffer, 256);
+            bzero(buffer, 256);
+            for (int x = 0; x <= maior; x++) {
+                if (FD_ISSET(x, &sockets)) {
+                    int n = read(x, buffer, 255);
+                    printf("%s\n", buffer);
+                    if (send(x, buffer, strlen(buffer), 0) <= 0) {
+                        printf("erro");
+                    }
+                    printf("mandou %s \n", buffer);
+                }
             }
-            printf("Date sent to client\n");
-            FD_SET(server_fd, &sockets);
-            tv.tv_sec = TIM;
 
+//            for (int x = 0; x <= maior; x++) {
+//                if (FD_ISSET(x, &sockets)) send(x, buffer, strlen(buffer), 0);
+//            }
+//            printf("Date sent to client\n");
         }
     }
     close(new_socket);
-
 
     return 0;
 }
